@@ -1,0 +1,403 @@
+---
+title: "R_Projekt_Gender"
+output: html_notebook
+---
+# Load libraries
+
+```{r}
+library(tidytext)
+library(tidyverse)
+library(quanteda)
+library(lubridate)
+library(ggplot2)
+library(plotly)
+library(forcats)
+library(readxl)
+library(leaflet)
+library(leaflet.minicharts)
+library(sp)
+library(sf)
+library(readr)
+library(stringr)
+library(rtweet)
+```
+
+# Load Data 
+
+```{r}
+Parlamentarier <- read_csv("Data/Parlamentarier.csv")
+```
+
+EU-Parlament rausfiltern
+```{r}
+Parlamentarier <- Parlamentarier %>% 
+  filter(Kategorie!="EU-Parlament")
+```
+
+Read Tabellen mit fehlenden Geschlechtern
+```{r}
+alle_geschlechter <- read_excel("Data/Parlamentarier_geschechter.xlsx", sheet = "Geschlechter")
+```
+
+Join fehlende Geschlechterangaben 
+```{r}
+Parlamentarier <- Parlamentarier %>% 
+  left_join(alle_geschlechter, by = c("Name" = "Name"))
+```
+
+Rename Spalten
+```{r}
+Parlamentarier <- Parlamentarier %>% 
+  rename(Geschlecht = Geschlecht.y)
+```
+
+Bundestag Geschlechterverteilung Partei
+```{r}
+bundestag <- Parlamentarier %>% 
+  select(id, Name, Geschlecht, Partei, Kategorie, SM_Twitter_id, SM_Twitter_user) %>% 
+  filter(Kategorie=="Bundestag")
+
+bundestag$Partei[bundestag$Partei == "CSU"] <-"CDU/CSU"
+bundestag$Partei[bundestag$Partei=="CDU"]<-"CDU/CSU"
+
+bundestag_man <- bundestag %>% 
+  group_by(Partei) %>% 
+  filter(Geschlecht == "männlich") %>% 
+  summarise(gesamt_man=n())
+
+bundestag_gesamt <- bundestag %>% 
+  group_by(Partei) %>% 
+  filter(Geschlecht == "weiblich") %>% 
+  summarise(gesamt_frau=n()) %>% 
+  left_join(bundestag_man) %>% 
+  mutate(row_sum=rowSums(.[2:3])) %>% 
+  arrange(desc(row_sum))
+```
+
+# Barchart Bundestag
+```{r}
+plot_ly(data=bundestag_gesamt, x=~reorder(Partei,-row_sum), y=~gesamt_frau, name="weiblich", marker=list(color=toRGB("#FB7F62")),
+        type="bar", hoverinfo="text", text=~paste("",row_sum), 
+        hovertemplate=paste("Anzahl: %{y:,.0f}", 
+                            "<br>Gesamtanzahl: %{text}")) %>% 
+  add_trace(y=~gesamt_man, name="männlich", marker=list(color=toRGB("#775285"))) %>% 
+  layout(barmode="stack", title="Geschlechterverteilung in den Parteien im Bundestag", 
+         xaxis=list(title="Partei"), yaxis=list(title="Anzahl Abgeordnete")) %>%
+  layout(legend=list(x=1, y=0.5))
+```
+
+Landtag Geschlechterverteilung Partei
+
+```{r}
+landtag_partei <- Parlamentarier %>% 
+  filter(Kategorie !="Bundestag") %>% 
+  filter(Kategorie!="EU-Parlament") %>% 
+  filter(Partei !="BIW") %>% 
+  filter(Partei!="SSW") %>% 
+  filter(Partei!="BVB/FW") %>% 
+  filter(Partei!="FW")
+```
+
+```{r}
+landtag_partei$Partei[landtag_partei$Partei == "CSU"] <-"CDU/CSU"
+landtag_partei$Partei[landtag_partei$Partei=="CDU"] <- "CDU/CSU"
+landtag_partei$Partei[landtag_partei$Partei=="FDP/DVP"] <- "FDP" 
+```
+
+```{r}
+landtag_man <- landtag_partei %>% 
+  group_by(Partei) %>% 
+  filter(Geschlecht=="männlich") %>% 
+  summarise(gesamt_man=n())
+
+landtag_gesamt <- landtag_partei %>% 
+  group_by(Partei) %>% 
+  filter(Geschlecht=="weiblich") %>% 
+  summarise(gesamt_frau=n()) %>% 
+  left_join(landtag_man) %>% 
+   mutate(row_sum=rowSums(.[2:3])) %>% 
+  arrange(desc(row_sum))
+```
+
+# Barchart Landtag
+```{r}
+plot_ly(data=landtag_gesamt, x=~reorder(Partei,-row_sum), y=~gesamt_frau, name="weiblich", marker=list(color=toRGB("#FB7F62")), 
+        type="bar", hoverinfo="text", text=~paste("",row_sum), 
+        hovertemplate=paste("Anzahl: %{y:,.0f}", 
+                            "<br>Gesamtanzahl: %{text}")) %>% 
+  add_trace(y=~gesamt_man, name="männlich", marker=list(color=toRGB("#775285"))) %>% 
+  layout(barmode="stack", title="Geschlechterverteilung in den Parteien in den Landtagen", 
+         xaxis=list(title="Partei"), yaxis=list(title="Anzahl Abgeordnete")) %>%
+  layout(legend=list(x=1, y=0.5))
+```
+
+# Map mit Geschlechterverteilung im Bundestag
+Alle Landtage herausfiltern
+```{r}
+parlamentarier_landtag <- Parlamentarier %>% 
+  filter(Kategorie %in% c("Abgeordnetenhaus von Berlin", 
+                          "Bayerischer Landtag", 
+                          "Bremische Bürgerschaft", 
+                          "Hamburgische Bürgerschaft", 
+                          "Hessischer Landtag", 
+                          "Landtag Brandenburg", 
+                          "Landtag des Saarlandes", 
+                          "Landtag Mecklenburg-Vorpommern", 
+                          "Landtag Nordrhein-Westfalen", 
+                          "Landtag Rheinland-Pfalz", 
+                          "Landtag Sachsen-Anhalt", 
+                          "Landtag von Baden-Württemberg", 
+                          "Niedersächsischer Landtag", 
+                          "Sächsischer Landtag", 
+                          "Schleswig-Holsteinischer Landtag", 
+                          "Thüringer Landtag"))
+```
+
+Vektoren und Datafram erstellen mit den Koordinaten, andenen die Späternen Pie Charts fixiert werden sollen. (Immer genau der Mittelpunkt des Bundeslandes)
+
+```{r}
+Kategorie <- c("Abgeordnetenhaus von Berlin", 
+               "Bayerischer Landtag", 
+               "Bremische Bürgerschaft",
+               "Hamburgische Bürgerschaft", 
+               "Hessischer Landtag",
+               "Landtag Brandenburg", 
+               "Landtag des Saarlandes",
+               "Landtag Mecklenburg-Vorpommern",
+               "Landtag Nordrhein-Westfalen",
+               "Landtag Rheinland-Pfalz",
+               "Landtag Sachsen-Anhalt", 
+               "Landtag von Baden-Württemberg", 
+               "Niedersächsischer Landtag", 
+               "Sächsischer Landtag", 
+               "Schleswig-Holsteinischer Landtag", 
+               "Thüringer Landtag")
+
+lat <- c(52.520008,
+         48.917431,
+         53.074982,
+         53.553815,
+         50.652052,
+         52.408418,
+         49.396423,
+         53.612651,
+         51.433237,
+         50.118346,
+         51.950265,
+         48.661604,
+         52.636704,
+         51.104541,
+         54.219367,
+         51.010989)
+
+lng <- c(13.404954,
+         11.407980,
+         8.807080,
+         9.991575,
+         9.162438,
+         12.562492,
+         7.022961,
+         12.429595,
+         7.661594,
+         7.308953,
+         11.692274,
+         9.350134,
+         9.845077,
+         13.201738,
+         9.696117,
+         10.845346)
+
+bundeslaender_koordinaten <- data.frame(Kategorie, lat, lng)
+```
+
+Tabelle nach Anzahl der männlichen und weiblichen Politiker*innen pro Bundesland filtern.
+
+```{r}
+parlamentarier_man <- parlamentarier_landtag %>% 
+  group_by(Kategorie) %>% 
+  filter(Geschlecht == "männlich") %>% 
+  summarise(männlich = n())
+
+parlamentarier_landtag_gesamt <- parlamentarier_landtag %>% 
+  group_by(Kategorie) %>% 
+  filter(Geschlecht == "weiblich") %>% 
+  summarise(weiblich = n()) %>% 
+  left_join(parlamentarier_man)
+```
+
+Koordinaten der späteren Pie charts zur Haupttabelle joinen
+
+```{r}
+parlamentarier_koordinaten <- parlamentarier_landtag_gesamt %>% 
+  left_join(bundeslaender_koordinaten, by = c("Kategorie" = "Kategorie"))
+```
+
+# Map with charts
+Farben für die Geschlechter erstellen, sowie die Grenzen der Bundesländer improtieren und mit Namen versehen (popup).
+```{r}
+colors <- c("#FB7F62", "#775285")
+
+grenzen <- readRDS("Data/gadm36_DEU_1_sp.rds") %>% 
+  st_as_sf()
+
+popup_bundeslaender <- paste0("<strong>Bundesland: </strong>", grenzen$NAME_1)
+```
+
+# Map mit Pie Charts 
+erstellen, Pie charts mit Hilfe von addMinicharts angefügt. 
+
+```{r}
+map <- leaflet() %>% 
+  addProviderTiles(providers$CartoDB.VoyagerLabelsUnder) %>% 
+  setView(lng = 10.451526, lat = 51.165691, zoom = 5.5) %>% 
+  addPolygons(data = grenzen,
+              fillColor = "grey",
+              fillOpacity = 0.1,
+              weight = 3,
+              color = "grey",
+              popup = popup_bundeslaender) %>% 
+  addMinicharts(
+    parlamentarier_koordinaten$lng, parlamentarier_koordinaten$lat,
+    type = "pie",
+    chartdata = parlamentarier_koordinaten[, c("weiblich", "männlich")],
+    colorPalette = colors,
+    width = 46,
+    height = 46,
+    opacity = 0.8,
+    legendPosition = "bottomright"
+  )
+map
+```
+
+# Tweets der Politiker*innen scrapen
+
+Nicht als ausführbaren Code, damit die Daten nicht nochmals gezogen werden...
+
+Twitter_accounts <- Parlamentarier %>%
+  filter(Kategorie!="EU-Parlament") %>%
+  filter(Partei!="BIW") %>% 
+  filter(Partei!="SSW") %>% 
+  filter(Partei!="BVB/FW") %>% 
+  filter(Partei!="FW") %>% 
+  filter(Partei!="fraktionslos") %>% 
+  filter(SM_Twitter_user != "")
+
+token <- get_token()
+token
+
+alle_tweets <- list()
+userIdList = list(Twitter_accounts$SM_Twitter_user)
+rl <- rate_limit(token, "statuses/user_timeline")
+for(user in userIdList[[1]]){
+  alle_tweets[[user]] <- get_timeline(user, n = 2, check = F)
+  print("rate limit remaining:", str(rl$remaining))
+  print("at user:", str(user))
+  rl <- rl %>%
+    mutate(remaining = remaining - 1)
+  # if rate limit exhausted, then wait to rate limit reset
+  if (rl$remaining == 5L) {
+    rl <- rate_limit(token, "statuses/user_timeline")
+    print("rate limit exceeded, waiting for 900s at user", str(user))
+    Sys.sleep(as.numeric(rl$reset, "secs"))
+  }
+}
+
+# Nach relevanten Hashtags filtern 
+
+"alle_tweets" ist die Datei mit allen gezogenen Tweets.
+```{r}
+alle_tweets <- read_rds("Data/alle_tweets.rds")
+
+suchbegriffe <- read_excel("Data/Twitter-Hashtags.xlsx", sheet ="Tabelle2")
+
+suchbegriffe_vector <- suchbegriffe$Hashtags
+
+alle_tweets <- bind_rows(alle_tweets)
+
+alle_tweets <- alle_tweets %>% 
+  mutate(text = tolower(text))
+
+filtert_tweets <- alle_tweets %>% 
+  filter(str_detect(text, paste (suchbegriffe_vector, collapse = "|")))
+
+write_rds(filtert_tweets, "final_tweets.rds")
+```
+
+#Sentimentanalyse
+
+```{r}
+Parlamentarier_senti <- Parlamentarier %>% 
+  filter(Partei!="BIW") %>% 
+  filter(Partei!="SSW") %>% 
+  filter(Partei!="BVB/FW") %>% 
+  filter(Partei!="FW") %>% 
+  filter(Partei!="fraktionslos") %>% 
+  filter(SM_Twitter_user != "") %>% 
+  select(Name, Partei, SM_Twitter_user, Geschlecht) %>% 
+  mutate(SM_Twitter_user=tolower(SM_Twitter_user))
+```
+
+Wert Umwandlung um CDU/CSU & FDP/DVP zusammenzufassen
+```{r}
+Parlamentarier_senti$Partei[Parlamentarier_senti$Partei == "CSU"] <- "CDU/CSU"
+Parlamentarier_senti$Partei[Parlamentarier_senti$Partei == "CDU"] <- "CDU/CSU"
+Parlamentarier_senti$Partei[Parlamentarier_senti$Partei == "FDP/DVP"] <- "FDP" 
+```
+
+```{r}
+load("Data/sentiWS.RData")
+sentiws <- dictionary(list(positive=positive, negative=negative))
+```
+
+```{r}
+tweet_corpus <- corpus(alle_tweets, text_field = "text")
+```
+
+tokenisieren
+
+```{r}
+token <- tokens(tweet_corpus)
+dfm <- dfm(token)
+
+senti <- dfm_lookup(dfm, sentiws)  
+senti <- dfm_group(senti, groups = screen_name)
+```
+
+```{r}
+senti_frame <- senti %>% 
+  convert(to="data.frame") %>% 
+  as_tibble() %>% 
+  mutate(doc_id=tolower(doc_id))
+
+senti_final_frame <- senti_frame %>% 
+  full_join(Parlamentarier_senti, by=c("doc_id"="SM_Twitter_user")) %>% 
+  group_by(Partei) %>% 
+  summarise(across(c(negative, positive), ~round(sum(., na.rm = TRUE)/sum(negative + positive, na.rm = TRUE ), digits = 2)))
+```
+
+# Barchart
+```{r}
+senti_bar <- senti_final_frame %>% 
+  mutate(Partei = fct_reorder(Partei, positive, max)) %>% 
+  pivot_longer(c(positive, negative), values_to = c("Verhältnis"), names_to = c("Äußerung")) %>% 
+  ggplot() + 
+  geom_bar(aes(Partei,
+               Verhältnis,               
+               fill = Äußerung),
+           position = "stack",
+           stat = "identity") +
+  scale_fill_manual(values = c("#f46666", "#8EC9BB")) + 
+  theme_classic() + 
+  labs(
+    title = "Äußerungen auf der Politiker*innen auf Twitter zum Thema 'Gender'",
+    subtitle = "Analyse",
+    x = "Partei",
+    y = "Verhältnis",
+    fill = "Äußerung"
+  )
+
+final_senti_plot <- ggplotly(senti_bar)
+final_senti_plot
+```
+
+
