@@ -2,7 +2,7 @@
 title: "R_Projekt_Gender"
 output: html_notebook
 ---
-# Load libraries
+# Load libraries 
 
 ```{r}
 library(tidytext)
@@ -20,6 +20,9 @@ library(sf)
 library(readr)
 library(stringr)
 library(rtweet)
+library(ggraph)
+library(ggrepel)
+library(tidygraph)
 ```
 
 # Load Data 
@@ -51,7 +54,11 @@ Parlamentarier <- Parlamentarier %>%
   rename(Geschlecht = Geschlecht.y)
 ```
 
-Bundestag Geschlechterverteilung Partei
+# Bundestag Geschlechterverteilung pro Partei
+
+* filtern nach Bundestag
+* CDU & CSU zusammenfügen 
+* nach männlich und weiblich gruppieren, Anzahl berechnen und sortieren
 ```{r}
 bundestag <- Parlamentarier %>% 
   select(id, Name, Geschlecht, Partei, Kategorie, SM_Twitter_id, SM_Twitter_user) %>% 
@@ -74,20 +81,26 @@ bundestag_gesamt <- bundestag %>%
   arrange(desc(row_sum))
 ```
 
-# Barchart Bundestag
+### Barchart Bundestag
+
+* Stacked-Barchart zur Geschlechterverteilung im Bundestag pro Partei
+* visualisierung der Daten in möglichst geschlechterneuralen Farben
 ```{r}
 plot_ly(data=bundestag_gesamt, x=~reorder(Partei,-row_sum), y=~gesamt_frau, name="weiblich", marker=list(color=toRGB("#FB7F62")),
         type="bar", hoverinfo="text", text=~paste("",row_sum), 
         hovertemplate=paste("Anzahl: %{y:,.0f}", 
                             "<br>Gesamtanzahl: %{text}")) %>% 
   add_trace(y=~gesamt_man, name="männlich", marker=list(color=toRGB("#775285"))) %>% 
-  layout(barmode="stack", title="Geschlechterverteilung in den Parteien im Bundestag", 
-         xaxis=list(title="Partei"), yaxis=list(title="Anzahl Abgeordnete")) %>%
+  layout(barmode="stack", title="Geschlechterverteilung in den Parteien im Bundestag", # titel position und größe ändern
+         xaxis = list(title = ""), yaxis=list(title="Anzahl Abgeordnete")) %>%
   layout(legend=list(x=1, y=0.5))
 ```
 
-Landtag Geschlechterverteilung Partei
+# Landtag Geschlechterverteilung pro Partei
 
+* filtern allen Landtagen
+* CDU & CSU sowie FDP & DVP zusammenfügen 
+* nach männlich und weiblich gruppieren, Anzahl berechnen und sortieren
 ```{r}
 landtag_partei <- Parlamentarier %>% 
   filter(Kategorie !="Bundestag") %>% 
@@ -119,20 +132,24 @@ landtag_gesamt <- landtag_partei %>%
   arrange(desc(row_sum))
 ```
 
-# Barchart Landtag
+### Barchart Landtag
+
+* Stacked-Barchart zur Geschlechterverteilung in den Landtagen pro Partei
+* visualisierung der Daten in möglichst geschlechterneuralen Farben
 ```{r}
 plot_ly(data=landtag_gesamt, x=~reorder(Partei,-row_sum), y=~gesamt_frau, name="weiblich", marker=list(color=toRGB("#FB7F62")), 
         type="bar", hoverinfo="text", text=~paste("",row_sum), 
         hovertemplate=paste("Anzahl: %{y:,.0f}", 
                             "<br>Gesamtanzahl: %{text}")) %>% 
   add_trace(y=~gesamt_man, name="männlich", marker=list(color=toRGB("#775285"))) %>% 
-  layout(barmode="stack", title="Geschlechterverteilung in den Parteien in den Landtagen", 
-         xaxis=list(title="Partei"), yaxis=list(title="Anzahl Abgeordnete")) %>%
+  layout(barmode="stack", title="Geschlechterverteilung in den Parteien in den Landtagen", # titel position und größe ändern
+         xaxis=list(title=""), yaxis=list(title="Anzahl Abgeordnete")) %>%
   layout(legend=list(x=1, y=0.5))
 ```
 
-# Map mit Geschlechterverteilung im Bundestag
-Alle Landtage herausfiltern
+# Map mit Geschlechterverteilung in den Landtagen
+
+* Alle Landtage herausfiltern
 ```{r}
 parlamentarier_landtag <- Parlamentarier %>% 
   filter(Kategorie %in% c("Abgeordnetenhaus von Berlin", 
@@ -153,7 +170,7 @@ parlamentarier_landtag <- Parlamentarier %>%
                           "Thüringer Landtag"))
 ```
 
-Vektoren und Datafram erstellen mit den Koordinaten, andenen die Späternen Pie Charts fixiert werden sollen. (Immer genau der Mittelpunkt des Bundeslandes)
+* Vektoren und Dataframe erstellen mit den Koordinaten an denen die späteren Pie-Charts fixiert werden sollen. (Immer genau im Mittelpunkt des Bundeslandes)
 
 ```{r}
 Kategorie <- c("Abgeordnetenhaus von Berlin", 
@@ -210,7 +227,7 @@ lng <- c(13.404954,
 bundeslaender_koordinaten <- data.frame(Kategorie, lat, lng)
 ```
 
-Tabelle nach Anzahl der männlichen und weiblichen Politiker*innen pro Bundesland filtern.
+* Dataframe nach Anzahl der männlichen und weiblichen Politiker*innen pro Bundesland filtern.
 
 ```{r}
 parlamentarier_man <- parlamentarier_landtag %>% 
@@ -225,15 +242,16 @@ parlamentarier_landtag_gesamt <- parlamentarier_landtag %>%
   left_join(parlamentarier_man)
 ```
 
-Koordinaten der späteren Pie charts zur Haupttabelle joinen
+* Koordinaten der späteren Pie-Charts zur Haupttabelle joinen
 
 ```{r}
 parlamentarier_koordinaten <- parlamentarier_landtag_gesamt %>% 
   left_join(bundeslaender_koordinaten, by = c("Kategorie" = "Kategorie"))
 ```
 
-# Map with charts
-Farben für die Geschlechter erstellen, sowie die Grenzen der Bundesländer improtieren und mit Namen versehen (popup).
+# Map mit Pie-Charts
+
+* geschlechterneutrale Farben für die Geschlechterverteilung erstellen, sowie die Grenzen der Bundesländer importieren und mit Namen versehen (popup).
 ```{r}
 colors <- c("#FB7F62", "#775285")
 
@@ -243,8 +261,7 @@ grenzen <- readRDS("Data/gadm36_DEU_1_sp.rds") %>%
 popup_bundeslaender <- paste0("<strong>Bundesland: </strong>", grenzen$NAME_1)
 ```
 
-# Map mit Pie Charts 
-erstellen, Pie charts mit Hilfe von addMinicharts angefügt. 
+* Pie-Charts mit Hilfe von addMinicharts zur Karte angefügt. 
 
 ```{r}
 map <- leaflet() %>% 
@@ -302,9 +319,10 @@ for(user in userIdList[[1]]){
   }
 }
 
-# Nach relevanten Hashtags filtern 
+### Nach relevanten Hashtags filtern 
 
-"alle_tweets" ist die Datei mit allen gezogenen Tweets.
+* "alle_tweets.rds" ist die Datei mit allen gezogenen Tweets.
+* nach relevanten Tweets filtern mit vorher bestimmten Hashtags ("Twitter-Hashtags.xlsx"), Tweets in Kleinschreibung formatieren und als "final_tweets.rds" exportieren. 
 ```{r}
 alle_tweets <- read_rds("Data/alle_tweets.rds")
 
@@ -323,8 +341,11 @@ filtert_tweets <- alle_tweets %>%
 write_rds(filtert_tweets, "final_tweets.rds")
 ```
 
-#Sentimentanalyse
+# Sentimentanalyse
 
+* nach den "großen" Parteien filtern
+* alle Politiker*innen entfernen, welche keinen Twitteraccount besitzen
+* Usernames in Kleinschreibung formatieren
 ```{r}
 Parlamentarier_senti <- Parlamentarier %>% 
   filter(Partei!="BIW") %>% 
@@ -337,23 +358,27 @@ Parlamentarier_senti <- Parlamentarier %>%
   mutate(SM_Twitter_user=tolower(SM_Twitter_user))
 ```
 
-Wert Umwandlung um CDU/CSU & FDP/DVP zusammenzufassen
+* CDU & CSU sowie FDP & DVP zusammenfügen 
 ```{r}
 Parlamentarier_senti$Partei[Parlamentarier_senti$Partei == "CSU"] <- "CDU/CSU"
 Parlamentarier_senti$Partei[Parlamentarier_senti$Partei == "CDU"] <- "CDU/CSU"
 Parlamentarier_senti$Partei[Parlamentarier_senti$Partei == "FDP/DVP"] <- "FDP" 
 ```
 
+* SentiWS importieren, um positive und negative Wörter zu klassifizieren
+* Liste zur Sentimentanalyse ist von Universität Leipzig: "https://wortschatz.uni-leipzig.de/de/download"
 ```{r}
 load("Data/sentiWS.RData")
 sentiws <- dictionary(list(positive=positive, negative=negative))
 ```
 
+* Corpus aus den Texten der gefilterten Tweets bilden
 ```{r}
-tweet_corpus <- corpus(alle_tweets, text_field = "text")
+tweet_corpus <- corpus(filtert_tweets, text_field = "text")
 ```
 
-tokenisieren
+* tokenisieren der Texte und bilden einer DFM
+* sentiws und "Tweet-Tokens" zusammenführen, sowie nach screen_name gruppieren
 
 ```{r}
 token <- tokens(tweet_corpus)
@@ -363,9 +388,14 @@ senti <- dfm_lookup(dfm, sentiws)
 senti <- dfm_group(senti, groups = screen_name)
 ```
 
+* DFM zum Dataframe konvertieren
+* doc_id in Kleinschreibung formatieren
+* Parlamentarier_senti joinen
+* Gruppieren nach Partei
+* Sentiment der einzelnen User*innen auf Parteiebene zusammenfassen und Verhältnis positive/negative bilden
 ```{r}
 senti_frame <- senti %>% 
-  convert(to="data.frame") %>% 
+  convert(to= "data.frame") %>% 
   as_tibble() %>% 
   mutate(doc_id=tolower(doc_id))
 
@@ -375,7 +405,11 @@ senti_final_frame <- senti_frame %>%
   summarise(across(c(negative, positive), ~round(sum(., na.rm = TRUE)/sum(negative + positive, na.rm = TRUE ), digits = 2)))
 ```
 
-# Barchart
+### Barchart
+
+* Partei absteigend nach negativem Sentiment sortieren
+* Beschriftung der X- und Y Werte ändern
+* Barchart bilden und in ggplotly konvertieren
 ```{r}
 senti_bar <- senti_final_frame %>% 
   mutate(Partei = fct_reorder(Partei, positive, max)) %>% 
@@ -389,8 +423,8 @@ senti_bar <- senti_final_frame %>%
   scale_fill_manual(values = c("#f46666", "#8EC9BB")) + 
   theme_classic() + 
   labs(
-    title = "Äußerungen auf der Politiker*innen auf Twitter zum Thema 'Gender'",
-    subtitle = "Analyse",
+    title = "Äußerungen der Politiker*innen auf Twitter zum Thema 'Gender'",
+    subtitle = "Einschätzung durch Sentimentanalyse",
     x = "Partei",
     y = "Verhältnis",
     fill = "Äußerung"
@@ -399,5 +433,107 @@ senti_bar <- senti_final_frame %>%
 final_senti_plot <- ggplotly(senti_bar)
 final_senti_plot
 ```
+
+# Twitter Netzwerk 
+
+* filtert_tweets "verkleinern" und in tweets_network speichern
+* screen_name in Kleinschreibung formatieren
+```{r}
+tweets_network <- filtert_tweets %>% 
+  select(screen_name,
+         retweet_screen_name,
+         created_at) %>% 
+  mutate(screen_name = tolower(screen_name))
+```
+
+* Parlamentarier Dataframe mit tweets_network joinen, um Klaramen und Parteizugehörigkeit der Politiker*innnen zu bekommen
+```{r}
+parlamentarier_network <- Parlamentarier %>% 
+  select(Name,
+         Partei,
+         SM_Twitter_user) %>% 
+  drop_na(SM_Twitter_user) %>% 
+  mutate(SM_Twitter_user = tolower(SM_Twitter_user)) %>% 
+  rename("screen_name" = "SM_Twitter_user")
+
+network_data <- parlamentarier_network %>% 
+  left_join(tweets_network, by = "screen_name")
+```
+
+* Häufigkeit der Tweets zum Thema berechnen 
+* Häufigkeit zu network_data joinen
+```{r}
+hauefigkeit_tweets <- network_data %>% 
+  count(screen_name)
+
+network_data <- network_data %>% 
+  left_join(hauefigkeit_tweets, by = "screen_name")
+```
+
+* Vektor der screen_names aller Politiker*innen erstellen
+* retweet_screen_name auf diese screen_names filtern, um "Fremduser*innen" auszuschließen 
+```{r}
+screen_suche <- parlamentarier_network$screen_name
+
+filtered_retweeters <- network_data %>% 
+  filter(str_detect(retweet_screen_name, paste (screen_suche, collapse = "|")))
+```
+
+* Netz mit relevanten Werten definieren mit: 
+* Edges = von screen_name zu retweet_screen_name
+* Nodes = Politiker*innen (screen_name und retweet_screen_name) 
+* Joine aufs Netz Parteizugehörigkeit, Klarnamen und Häufigkeit der Tweets zum Thema (n)
+```{r}
+netz <- filtered_retweeters %>% 
+  filter(!is.na(retweet_screen_name)) %>% 
+  select(from = screen_name, to = retweet_screen_name) %>% 
+  as_tbl_graph
+
+netz <- netz %>% 
+  mutate(
+    degree = centrality_degree(mode = "in"), 
+    component = group_components()
+  ) %>% 
+  left_join(network_data %>% 
+              select(Name, screen_name, Partei, n) %>% distinct(screen_name, .keep_all = T),
+            by = c( "name" ="screen_name")) 
+```
+
+* Farben für Parteien definieren
+```{r}
+partei_farben <- list(
+  "CDU/CSU" = "black",
+  "SPD" = "red",
+  "CSU" = "black",
+  "FDP" = "#e2b007",
+  "GRÜNE" = "#07C23F",
+  "LINKE" = "#de4c8a", 
+  "AfD" = "blue"
+)
+```
+
+# Netzwerk
+
+Zuweisung von Attributen an Nodes:
+* Parteizugehörigkeit in Farbe
+* Klarname der Politiker*innen als Label 
+* Anzahl der Tweets in Größe
+```{r}
+netz_plot <- netz %>% 
+  filter(component <= 6) %>% 
+  mutate(degree = centrality_degree(mode = "in")) %>% 
+  ggraph(layout = "fr") +
+  geom_edge_link(alpha = 0.25, arrow = arrow(length = unit("5", "mm"))) +
+  geom_node_point(aes(size = n, color = Partei)) + 
+  scale_color_manual(values = partei_farben) +
+  theme_graph(background = "white") + # theme
+  geom_node_label(aes(filter = n >= 15, label = Name), repel = T, show.legend = F, alpha = 0.5) + #position = "jitter"
+  labs(title = "Retweet-Netzwerke deutscher Politiker*innen", size = "Anzahl Tweets", subtitle = "zum Thema 'Gender' ab 2016")
+```
+```{r}
+netz_plot 
+```
+
+NODES DEUTLICHERE ABSTUFUNG, VLT. THEME FUNKTIONIERT NICHT RICHTIG
 
 
