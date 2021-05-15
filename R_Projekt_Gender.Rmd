@@ -20,6 +20,9 @@ library(sf)
 library(readr)
 library(stringr)
 library(rtweet)
+library(ggraph)
+library(ggrepel)
+library(tidygraph)
 ```
 
 # Load Data 
@@ -350,7 +353,7 @@ sentiws <- dictionary(list(positive=positive, negative=negative))
 ```
 
 ```{r}
-tweet_corpus <- corpus(alle_tweets, text_field = "text")
+tweet_corpus <- corpus(filtert_tweets, text_field = "text")
 ```
 
 tokenisieren
@@ -400,4 +403,86 @@ final_senti_plot <- ggplotly(senti_bar)
 final_senti_plot
 ```
 
+# Twitter Netzwerk 
 
+```{r}
+tweets_network <- filtert_tweets %>% 
+  select(screen_name,
+         retweet_screen_name) %>% 
+  mutate(screen_name = tolower(screen_name))
+```
+
+```{r}
+parlamentarier_network <- Parlamentarier %>% 
+  select(Name,
+         Partei,
+         SM_Twitter_user) %>% 
+  drop_na(SM_Twitter_user) %>% 
+  mutate(SM_Twitter_user = tolower(SM_Twitter_user)) %>% 
+  rename("screen_name" = "SM_Twitter_user")
+
+network_data <- parlamentarier_network %>% 
+  left_join(tweets_network, by = "screen_name")
+```
+
+häufigkeit der tweets zum Thema 
+```{r}
+hauefigkeit_tweets <- network_data %>% 
+  count(screen_name)
+
+# join häufigkeit
+network_data <- network_data %>% 
+  left_join(hauefigkeit_tweets, by = "screen_name")
+```
+
+screen_name suche
+```{r}
+screen_suche <- parlamentarier_network$screen_name
+
+filtered_retweeters <- network_data %>% 
+  filter(str_detect(retweet_screen_name, paste (screen_suche, collapse = "|")))
+```
+
+netz definieren 
+```{r}
+netz <- filtered_retweeters %>% 
+  filter(!is.na(retweet_screen_name)) %>% 
+  select(from = screen_name, to = retweet_screen_name) %>% 
+  as_tbl_graph
+
+netz <- netz %>% 
+  mutate(
+    degree = centrality_degree(mode = "in"), 
+    component = group_components()
+  ) %>% 
+  left_join(network_data %>% 
+              select(Name, screen_name, Partei, n) %>% distinct(screen_name, .keep_all = T),
+            by = c( "name" ="screen_name")) 
+```
+
+fraben für Parteien
+```{r}
+partei_farben <- list(
+  "CDU/CSU" = "black",
+  "SPD" = "red",
+  "CSU" = "black",
+  "FDP" = "yellow",
+  "GRÜNE" = "green",
+  "LINKE" = "violet", 
+  "AfD" = "blue"
+)
+```
+
+# Netzwerk
+```{r}
+netz %>% 
+  filter(component <= 6) %>% 
+  mutate(degree = centrality_degree(mode = "in")) %>% 
+  ggraph(layout = "kk") +
+  geom_edge_link(alpha = 0.25, arrow = arrow(length = unit("5", "mm"))) +
+  geom_node_point(aes(size = n)) + 
+  scale_color_manual(values = partei_farben) +
+  geom_node_label(aes(label = Name, color = Partei), repel = T, show.legend = F, alpha = 0.5) +
+  labs(title = "Retweet-Netzwerk deutscher Politiker*innen", size = "Anzahl Tweets")
+```
+FARBLEGENDE ÄNDERN, FARBEN ÄNDERN
