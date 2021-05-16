@@ -5,7 +5,7 @@ output: html_notebook
 # Load libraries 
 
 ```{r}
-library(tidytext)
+library(tidytext) 
 library(tidyverse)
 library(quanteda)
 library(lubridate)
