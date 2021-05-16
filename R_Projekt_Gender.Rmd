@@ -435,7 +435,6 @@ final_senti_plot
 ```
 
 # Twitter Netzwerk 
-<<<<<<< HEAD
 
 * filtert_tweets "verkleinern" und in tweets_network speichern
 * screen_name in Kleinschreibung formatieren
