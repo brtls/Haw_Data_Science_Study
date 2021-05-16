@@ -1,6 +1,6 @@
 ---
 title: "R_Projekt_Gender"
-output: html_notebook
+output: html_notebook 
 ---
 # Load libraries 
 
@@ -435,6 +435,7 @@ final_senti_plot
 ```
 
 # Twitter Netzwerk 
+<<<<<<< HEAD
 
 * filtert_tweets "verkleinern" und in tweets_network speichern
 * screen_name in Kleinschreibung formatieren
@@ -535,5 +536,3 @@ netz_plot
 ```
 
 NODES DEUTLICHERE ABSTUFUNG, VLT. THEME FUNKTIONIERT NICHT RICHTIG
-
-
