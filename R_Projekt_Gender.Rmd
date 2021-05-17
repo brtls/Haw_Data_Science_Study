@@ -395,7 +395,7 @@ senti <- dfm_group(senti, groups = screen_name)
 * Sentiment der einzelnen User*innen auf Parteiebene zusammenfassen und Verhältnis positive/negative bilden
 ```{r}
 senti_frame <- senti %>% 
-  convert(to= "data.frame") %>% 
+  quanteda::convert(to= "data.frame") %>% 
   as_tibble() %>% 
   mutate(doc_id=tolower(doc_id))
 
