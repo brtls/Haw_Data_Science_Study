@@ -1,8 +1,23 @@
 ---
-title: "R_Projekt_Gender"
+title: "Datenanalyseprojekt zum Thema Gender in der deutschen Politik"
 output: html_notebook 
 ---
-# Load libraries 
+
+„‘Jeder soll privat #gendern wie er will, aber ich möchte mich nicht im öffentlich-rechtlichen Rundfunk mit moralischem Zeigefinger belehren lassen, wie ich zu sprechen habe. Wer gibt gebührenfinanzierten Redakteuren das Recht, dafür Anpassungsdruck zu erzeugen?‘ (tm) #Merz #Lanz“ – so lautet ein Tweet von CDU-Politiker Friedrich Merz vom 07.05.2021. 
+
+Über das Gendern in der Sprache wird aktuell hitzig diskutiert. Anstelle des generischen Maskulinums werden dabei zur Gleichstellung der Geschlechter entweder alle tatsächlich gemeinten Geschlechter aktiv genannt oder geschlechtsneutrale Begriffe verwendet. Das Beispiel von Friedrich Merz zeigt, dass nicht jede*r mit dieser sprachlichen Anpassung einverstanden ist. 
+
+Auch in anderen Bereichen bleibt die fehlende Gleichstellung relevant: Laut Statistischem Bundesamt haben Frauen im Jahr 2020 durchschnittlich 18% weniger Bezahlung erhalten als Männer. Und der Anteil von Frauen in Aufsichtsräten von Unternehmen, die keiner festen Quotenregelung unterliegen, beträgt aktuell nur 19,9% (BMFSFJ). 
+
+Die genannten Beispiele zeigen die Aktualität des Themas, weshalb im Rahmen dieses Projekts unterschiedliche Datenanalysen und -visualisierungen durchgeführt wurden, welche sich alle um das Thema Gender in der Politik drehen. 
+
+Um zu untersuchen, wie sich die Frauenquote bei den Vertreter:innen der Gesellschaft darstellt, wurde zunächst eine Analyse der Geschlechterverteilung der Fraktionen im Bundestag und in den Landtagen durchgeführt. Außerdem wurde die Geschlechterverteilung der Landtage ohne Fraktionsbezug pro Bundesland untersucht, um einen Ländervergleich zu ermöglichen. Basis für diese Auswertung war der aktuelle DBoeS-Datensatz von “2020 Leibniz-Institut für Medienforschung | Hans-Bredow-Institut" über deutsche Politiker*innen. (Link zum Datensatz: https://github.com/Leibniz-HBI/DBoeS-Automatization/blob/master/LICENSE)  
+
+Außerdem wurden Tweets von Politiker*innen zum Thema Gender als Grundlage für eine Sentiment-Analyse verwendet. 
+
+Dieser Twitter-Datensatz wurde abschließend eingesetzt, um eine Netzwerkanalyse durchzuführen: Dargestellt wird, welche Politiker*innen durch Retweets miteinander vernetzt sind und sich so aufeinander beziehen. 
+
+### Load libraries 
 
 ```{r}
 library(tidytext) 
@@ -25,7 +40,7 @@ library(ggrepel)
 library(tidygraph)
 ```
 
-# Load Data 
+### Load Data 
 
 ```{r}
 Parlamentarier <- read_csv("Data/Parlamentarier.csv")
@@ -54,7 +69,7 @@ Parlamentarier <- Parlamentarier %>%
   rename(Geschlecht = Geschlecht.y)
 ```
 
-# Bundestag Geschlechterverteilung pro Partei
+### Bundestag Geschlechterverteilung pro Partei
 
 * filtern nach Bundestag
 * CDU & CSU zusammenfügen 
@@ -81,7 +96,7 @@ bundestag_gesamt <- bundestag %>%
   arrange(desc(row_sum))
 ```
 
-### Barchart Bundestag
+## Balkendiagramm: Geschlechterverteilung im Bundestag
 
 * Stacked-Barchart zur Geschlechterverteilung im Bundestag pro Partei
 * visualisierung der Daten in möglichst geschlechterneuralen Farben
@@ -96,7 +111,7 @@ plot_ly(data=bundestag_gesamt, x=~reorder(Partei,-row_sum), y=~gesamt_frau, name
   layout(legend=list(x=1, y=0.5))
 ```
 
-# Landtag Geschlechterverteilung pro Partei
+### Landtag Geschlechterverteilung pro Partei
 
 * filtern allen Landtagen
 * CDU & CSU sowie FDP & DVP zusammenfügen 
@@ -132,7 +147,7 @@ landtag_gesamt <- landtag_partei %>%
   arrange(desc(row_sum))
 ```
 
-### Barchart Landtag
+## Balkendiagramm: Geschlechterverteilung in den Landtagen
 
 * Stacked-Barchart zur Geschlechterverteilung in den Landtagen pro Partei
 * visualisierung der Daten in möglichst geschlechterneuralen Farben
@@ -146,8 +161,27 @@ plot_ly(data=landtag_gesamt, x=~reorder(Partei,-row_sum), y=~gesamt_frau, name="
          xaxis=list(title=""), yaxis=list(title="Anzahl Abgeordnete")) %>%
   layout(legend=list(x=1, y=0.5))
 ```
+# Balkendiagramme: Geschlechterverteilung
 
-# Map mit Geschlechterverteilung in den Landtagen
+Die beiden Balkendiagramme zeigen die aktuelle fraktionsbezogene Geschlechterverteilung in der deutschen Politik – einmal in Bezug auf den Bundestag und einmal hinsichtlich der Landtage. Im zweiten Fall wurden die Abgeordneten aller Landtage addiert, um so einen durchschnittlichen Gesamtüberblick zu ermöglichen. 
+
+Für eine bessere Vergleichbarkeit konzentrieren sich beide Darstellungen auf ihre gemeinsame Schnittmenge der Fraktionen. So wird beispielsweise die SSW nicht aufgeführt, da sie nur im Schleswig-Holsteinischen Landtag agiert. 
+
+Fraktionen, die in bestimmten Ländern andere Bezeichnungen haben, wurden zusammengefasst (CDU/CSU und FDP/DVP zu FDP). 
+
+Im verwendeten Datensatz lagen zwar Informationen zum Geschlecht vor, diese waren jedoch lückenhaft. Fehlende Geschlechtsangaben wurden manuell hinzugefügt, wobei vom üblichen Genus des Namens auf das Geschlecht geschlossen wurde. 
+
+Die Höhe der Balken gibt jeweils an, wie viele Abgeordnete die jeweilige Fraktion hat. Der lilafarbene Teil jedes Balkens zeigt die Anzahl der männlichen, der orangene Balken die Zahl der weiblichen Abgeordneten. Hovert man über die Balken, wird die jeweils geschlechtsbezogene Anzahl sowie die Gesamtanzahl der Abgeordneten angezeigt, um eine Einschätzung des Anteils zu ermöglichen. 
+
+Es ist erkennbar, dass die AfD sowohl in den Landtagen als auch im Bundestag deutlich mehr männliche Abgeordnete stellt. Eine ebenso auffällige Ungleichheit ist bei der FDP und CDU/CSU zu sehen. 
+
+Nahezu ausgeglichen ist dagegen die SPD im Bundestag, ebenso wie Die Linke in den Landtagen. Im Bundestag gibt es bei Die Linke sowie bei den Grünen mehr weibliche als männliche Abgeordnete. 
+
+
+
+
+
+### Karte mit Geschlechterverteilung in den Landtagen
 
 * Alle Landtage herausfiltern
 ```{r}
@@ -249,7 +283,7 @@ parlamentarier_koordinaten <- parlamentarier_landtag_gesamt %>%
   left_join(bundeslaender_koordinaten, by = c("Kategorie" = "Kategorie"))
 ```
 
-# Map mit Pie-Charts
+### Karte mit Tortendiagramm zur Geschlechterverteilung
 
 * geschlechterneutrale Farben für die Geschlechterverteilung erstellen, sowie die Grenzen der Bundesländer importieren und mit Namen versehen (popup).
 ```{r}
@@ -285,6 +319,19 @@ map <- leaflet() %>%
   )
 map
 ```
+# Karte mit Geschlechterverteilung in den Landtagen
+
+Die auf der Deutschlandkarte abgebildeten Torten-Diagramme veranschaulichen die Sitzverteilung der Abgeordneten in den deutschen Landesparlamenten aufgeschlüsselt nach der Geschlechterzugehörigkeit (männlichen Abgeordnete, weiblichen Abgeordnete).  
+
+Dabei wurde, um den Aspekt der landesspezifischen, aber deutschlandweiten Geschlechterrepräsentanz hervorzuheben, die Fraktionszugehörigkeit der Abgeordneten in der Darstellung nicht berücksichtigt.  
+
+Zunächst fällt auf, dass in allen Landesparlamenten mehr männliche Abgeordnete als weibliche Abgeordnete sitzen. Beinahe in jedem Landtag bewegt sich diese ungleiche Sitzverteilung zwischen einer zweidrittel - bis zu einer dreiviertel- Mehrheit an männlichen Abgeordneten.  
+
+Einzig die Hamburgische Bürgerschaft weist annähernd ein ausgeglichenes 1-zu-1-Verhältnis zwischen männlichen und weiblichen Abgeordneten auf, wenngleich auch hier die Anzahl der männlichen Abgeordneten leicht überwiegt. Am größten ist die Unausgeglichenheit in Sachsen-Anhalt mit 46 weiblichen Abgeordneten und 83 männlichen Abgeordneten. 
+
+
+
+
 
 # Tweets der Politiker*innen scrapen
 
@@ -341,6 +388,9 @@ filtert_tweets <- alle_tweets %>%
 write_rds(filtert_tweets, "final_tweets.rds")
 ```
 
+
+
+
 # Sentimentanalyse
 
 * nach den "großen" Parteien filtern
@@ -379,7 +429,6 @@ tweet_corpus <- corpus(filtert_tweets, text_field = "text")
 
 * tokenisieren der Texte und bilden einer DFM
 * sentiws und "Tweet-Tokens" zusammenführen, sowie nach screen_name gruppieren
-
 ```{r}
 token <- tokens(tweet_corpus)
 dfm <- dfm(token)
@@ -395,7 +444,7 @@ senti <- dfm_group(senti, groups = screen_name)
 * Sentiment der einzelnen User*innen auf Parteiebene zusammenfassen und Verhältnis positive/negative bilden
 ```{r}
 senti_frame <- senti %>% 
-  convert(to= "data.frame") %>% 
+  quanteda::convert(to = "data.frame") %>% 
   as_tibble() %>% 
   mutate(doc_id=tolower(doc_id))
 
@@ -405,7 +454,7 @@ senti_final_frame <- senti_frame %>%
   summarise(across(c(negative, positive), ~round(sum(., na.rm = TRUE)/sum(negative + positive, na.rm = TRUE ), digits = 2)))
 ```
 
-### Barchart
+### Barchart zum Sentiment der Tweets
 
 * Partei absteigend nach negativem Sentiment sortieren
 * Beschriftung der X- und Y Werte ändern
@@ -433,8 +482,29 @@ senti_bar <- senti_final_frame %>%
 final_senti_plot <- ggplotly(senti_bar)
 final_senti_plot
 ```
+# Sentiment-Analyse von Tweets zum Thema Gender
 
-# Twitter Netzwerk 
+Als Grundlage für die hier visualisierte Sentiment-Analyse dienen Tweets, welche von Abgeordneten der Landtage und des Bundestages zum Thema Gender abgesetzt wurden. Mit dieser Sentiment-Analyse ließ sich ermitteln, ob diese Tweets eher positiv oder eher negativ verfasst sind. Dafür wurde ein Wörterbuch eingesetzt, welches negativ und positiv konnotierte Worte und Äußerungen inklusive Gewichtungen beinhaltet. Dieses wurde mit den Tweets abgeglichen. Das Ergebnis zeigt, wie hoch der Anteil negativer und positiver Äußerungen ist. 
+
+Um dies umzusetzen, wurden zunächst mithilfe des DBoeS-Datensatzes alle Abgeordneten ausgewählt, die überhaupt einen Twitter-Account besitzen. 
+
+Anschließend wurden von diesen Nutzer:innen jeweils die letzten 1.000 Tweets heruntergeladen. Diese wurden auf 47 Hashtags gefiltert, welche vorher festgelegt wurden, um das Thema Gender abzubilden (z.B. #gendersternchen, #gendergaga, #equalpayday etc.)*. Es wurde darauf geachtet, dass sowohl positive als auch negative Hashtags einbezogen werden, um möglichst alle Meinungen für die Analyse einbeziehen zu können.  
+
+Die so gefilterten Tweets wurden dann zu einem Corpus zusammengefasst. Mit diesem Corpus wurde eine Sentiment-Analyse durchgeführt, wobei der Wortschatz „SentiWS“* der Universität Leipzig als Grundlage diente. Anschließend wurde nach den einzelnen Parteien gruppiert und der passende Teil des Corpus (je nach Parteizugehörigkeit des oder der tweetenden Abgeordneten) inklusive Analyseergebnis zugeordnet.  
+*https://wortschatz.uni-leipzig.de/de/download 
+
+Die Ergebnisse der Analyse sind in der Visualisierung zu erkennen. Die Abgeordneten von der AfD und von Die Linke haben gemeinsam den höchsten Anteil negativer Tweets verfasst, jeweils die Hälfte wurde als negativ ausgewertet. Der geringste negative Teil wurde bei der CDU/CSU festgestellt. 
+
+Zu beachten ist, dass aus der Sentiment-Analyse nicht hervorgeht, ob beispielsweise negativ über die Gleichbehandlung der Geschlechter geschrieben wird oder negativ darüber, dass es noch keine Gleichbehandlung gibt. Der genaue Inhalt des Tweets bleibt unbeachtet. Somit lässt sich hier nicht ablesen, ob die Abgeordneten der Parteien jeweils für Geschlechtergleichheit plädieren oder dagegen. Gerade am Ergebnis von AfD und Die Linke wird dies deutlich, da die Einstellungen bezüglich des Themas trotz gleichwertigem Ergebnis höchstwahrscheinlich verschieden sind. 
+
+*Liste aller gesuchten Hashtags: #genderpaygap, #genderequality, #womenempowerment, #feminism, #feminismus, #gendergaga, #gender, #sexismus, #GeenaOnGender, #gendering, #gendersprache, #genderequity, #gleichberechtigung, #frauenpower, #frauenrechte, #frauenbewegung, #everydaysexism, #fightsexism, #sexism, #nomeansno, #AintNoCinderella, #NiUnaMenos, #NiUnaMas, #MyStealthyFreedom, #equalpay, #femaleempowerment, #gendersternchen, #manspreading, #gendern, #menaretrash, #gendersprech, #genderverbot, #gendershit, #equalpayday, #womensday, #weltfrauentag, #internationalwomensday, #frauentag, #gendergerechtesprache, #genderpolizei, #femalehero, #genderschwachsinn, #geballterFeminismus, #geschlechterwahn, #geschlechterwahnsinn, #frauen, #männer 
+
+
+
+
+
+
+# Netzwerkanalyse deutscher Politiker*innen zum Thema Gender auf Twitter 
 
 * filtert_tweets "verkleinern" und in tweets_network speichern
 * screen_name in Kleinschreibung formatieren
@@ -442,8 +512,7 @@ final_senti_plot
 tweets_network <- filtert_tweets %>% 
   select(screen_name,
          retweet_screen_name,
-         created_at) %>% 
-  mutate(screen_name = tolower(screen_name))
+         created_at) 
 ```
 
 * Parlamentarier Dataframe mit tweets_network joinen, um Klaramen und Parteizugehörigkeit der Politiker*innnen zu bekommen
@@ -453,7 +522,6 @@ parlamentarier_network <- Parlamentarier %>%
          Partei,
          SM_Twitter_user) %>% 
   drop_na(SM_Twitter_user) %>% 
-  mutate(SM_Twitter_user = tolower(SM_Twitter_user)) %>% 
   rename("screen_name" = "SM_Twitter_user")
 
 network_data <- parlamentarier_network %>% 
@@ -476,7 +544,7 @@ network_data <- network_data %>%
 screen_suche <- parlamentarier_network$screen_name
 
 filtered_retweeters <- network_data %>% 
-  filter(str_detect(retweet_screen_name, paste (screen_suche, collapse = "|")))
+  filter(retweet_screen_name %in% screen_suche)
 ```
 
 * Netz mit relevanten Werten definieren mit: 
@@ -502,7 +570,7 @@ netz <- netz %>%
 * Farben für Parteien definieren
 ```{r}
 partei_farben <- list(
-  "CDU/CSU" = "black",
+  "CDU" = "black",
   "SPD" = "red",
   "CSU" = "black",
   "FDP" = "#e2b007",
@@ -512,7 +580,7 @@ partei_farben <- list(
 )
 ```
 
-# Netzwerk
+## Netzwerk
 
 Zuweisung von Attributen an Nodes:
 * Parteizugehörigkeit in Farbe
@@ -520,18 +588,38 @@ Zuweisung von Attributen an Nodes:
 * Anzahl der Tweets in Größe
 ```{r}
 netz_plot <- netz %>% 
-  filter(component <= 6) %>% 
-  mutate(degree = centrality_degree(mode = "in")) %>% 
+  filter(component <= 10) %>%  
   ggraph(layout = "fr") +
-  geom_edge_link(alpha = 0.25, arrow = arrow(length = unit("5", "mm"))) +
+  geom_edge_link(edge_color = "black", alpha = 0.25, edge_width = 0.1, end_cap = circle(2.5, "mm"), arrow = arrow(length = unit(2.5, "mm"), ends =  "last", type = "closed")) +
   geom_node_point(aes(size = n, color = Partei)) + 
   scale_color_manual(values = partei_farben) +
-  theme_graph(background = "white") + # theme
-  geom_node_label(aes(filter = n >= 15, label = Name), repel = T, show.legend = F, alpha = 0.5) + #position = "jitter"
+  scale_size(range = c(1, 8)) + 
+  theme_graph(background = "white") +
+  geom_node_label(aes(filter = n >= 40, label = Name), repel = T, show.legend = F, alpha = 0.5) +
   labs(title = "Retweet-Netzwerke deutscher Politiker*innen", size = "Anzahl Tweets", subtitle = "zum Thema 'Gender' ab 2016")
 ```
 ```{r}
-netz_plot 
+netz_plot
 ```
 
-NODES DEUTLICHERE ABSTUFUNG, VLT. THEME FUNKTIONIERT NICHT RICHTIG
+# Retweet-Netzwerke deutscher Politiker*innen zum Thema Gender
+
+Um die Aktivität einzelner Politiker*innen und ihre Vernetzung untereinander in Debatten, Diskussionen, Meinungsäußerungen und Stellungnahmen zum Thema Gender auf Twitter abzubilden, wurde sowohl die individuelle Anzahl der Tweets zum Thema als auch ihre gegenseitige Bezugnahme aufeinander in Form von Retweets untersucht. Diese Informationen wurden in einem Netzwerkdiagramm dargestellt. 
+
+Die so entstandenen Retweet-Netzwerke wurden aus den letzten 1.000 Tweets derjenigen Abgeordneten, welche über einen Twitter-Account verfügen und sich in diesen letzten 1.000 Tweets mindestens einmal zum Thema Gender äußerten, generiert. Der älteste miteinbezogene Tweet zum Thema wurde im August 2016 abgesetzt. Dennoch deckt diese Netzwerkanalyse nicht die Twitter-Aktivität aller untersuchten Politiker*innen bis zurück zu diesem Zeitpunkt ab. Grund hierfür ist, dass einige Politiker:innen, gemessen an der Frequenz, in der sie Tweets absetzen, eine vergleichsweise hohe Aktivität auf Twitter aufweisen, weswegen ihre letzten 1.000 Tweets nicht bis in den August 2016 zurückreichen.  
+
+Die Punkte in der Grafik stellen einzelne Abgeordnete dar. Die Größe des jeweiligen Punktes veranschaulicht die Anzahl der von der/dem Abgeordneten abgesetzten Tweets zum Thema Gender und gibt somit Aufschluss über eine eventuelle Schwerpunktsetzung der/des Abgeordneten. Zusätzlich wurden die Namen der Abgeordneten mit 40 und mehr Tweets zum Thema eingeblendet. Eine Verbindung zwischen zwei Punkten stellt einen Tweet dar, der geretweetet wurde. Dabei entspringt der Pfeil bei der/dem retweetenden Abgeordneten und weist auf die/den Abgeordneten, von der/dem der originäre Tweet stammt. Gehen mehrere Pfeile von einem Punkt aus, hat der/die entsprechende Abgeordnete mehrere Tweets anderer Abgeordneter geretweetet. Weisen mehrere Pfeile auf einen Punkt, so wurde der/die entsprechende Abgeordnete mehrfach von anderen Abgeordneten geretweetet. Zwischen zwei Punkten kann mehr als eine Verbindung bestehen. Die Farbe der Punkte symbolisiert die Parteizugehörigkeit der Abgeordneten.  
+
+In der Grafik sind mehrere nicht miteinander verbundene Netzwerkstrukturen zu erkennen. Sind Punkte in keiner Weise durch Verbindungslinien miteinander verknüpft, so nehmen die Abgeordneten in ihren entsprechenden Tweets keinen Bezug, oder zumindest keinerlei Bezug in Form von Retweets, aufeinander.  
+
+Das Verhältnis der einzelnen Netzwerke zueinander ist daher folgendermaßen zu beschreiben: Zwar können die nicht miteinander verknüpften Kommunikationsketten den gleichen Anlass zum Thema haben, weil sie z.B. in der gleichen Debatte entstanden sind (ohne dass dabei Verknüpfungen durch Retweets entstanden sind), sie können jedoch auch zu anderen Zeitpunkten und Anlässen entstanden sein, womit sie in keinem direkten Zusammenhang zueinander stünden. Was sie verbindet, ist dass sie das Kommunikationsverhalten und die Vernetzungsstrukturen von Bundestags- und Landtagsabgeordneten auf Twitter zum Thema Gender, welches durch die 47 Suchbegriffe (siehe Sentimentanalyse) erschlossen wurde, darstellen.  
+
+Es fällt auf, dass Abgeordnete der Parteien Grüne und Die Linke besonders stark in den Netzwerkstrukturen vertreten sind. Für alle Parteien ist festzustellen, dass die Abgeordneten sich zum Großteil parteiintern retweeten und vom Retweeten Abgeordneter anderer Parteien eher absehen. Dabei stechen erneut die Parteien Grüne und Die Linke durch eine etwas stärkere überparteiliche Vernetzung besonders untereinander hervor. Auch Abgeordnete der CDU nehmen vereinzelt Bezug auf Abgeordnete anderer Parteien. Wobei sowohl bei ihr als auch bei der SPD die verhältnismäßig geringe Präsenz in der Summe der Netzwerke auffällt. Bei FDP und AfD hingegen fällt die Isolation ihrer Netzwerke vom Rest der Netzwerkstrukturen auf. Während die FDP dabei jedoch verhältnismäßig starke innerparteiliche Verknüpfungen aufweist, sind die Netzwerke der AfD eher voneinander isoliert. 
+
+# Zusammenfassung der Ergebnisse 
+
+Zusammenfassend hat die Analyse gezeigt, dass es eine Diskrepanz zwischen der realen Geschlechterverteilung in der Gesellschaft und der Verteilung in der Repräsentation durch die Abgeordneten gibt.  
+
+Auch innerhalb der Parteien spielt das Thema Gender eine unterschiedlich große Rolle. Die Fraktionen der Parteien Grüne und Die Linke haben den verhältnismäßig größten Frauenanteil. In der Netzwerkanalyse zeigt sich, dass ebenfalls diese beiden Parteien sehr aktiv an dem Thema beteiligt sind.  
+
+Die Sentiment-Analyse hat gezeigt, dass sich die Fraktionen AfD und Die Linke zu 50% negativ und 50% positiv zu dem Thema auf Twitter äußern. Die anderen fünf Parteien melden sich eher positiv.  
