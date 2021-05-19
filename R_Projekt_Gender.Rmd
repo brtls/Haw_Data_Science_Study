@@ -2,7 +2,7 @@
 title: "Datenanalyseprojekt zum Thema Gender in der deutschen Politik"
 output: html_notebook 
 ---
-### von Malte Bartels, Anna Brauer, Yuliya Khytrova und Fred Nasser
+### von Malte Bartels, Anna Brauer, Yuliya Khytrova und Fred Nasser 
 
 „‘Jeder soll privat #gendern wie er will, aber ich möchte mich nicht im öffentlich-rechtlichen Rundfunk mit moralischem Zeigefinger belehren lassen, wie ich zu sprechen habe. Wer gibt gebührenfinanzierten Redakteuren das Recht, dafür Anpassungsdruck zu erzeugen?‘ (tm) #Merz #Lanz“ – so lautet ein Tweet von CDU-Politiker Friedrich Merz vom 07.05.2021. 
 
