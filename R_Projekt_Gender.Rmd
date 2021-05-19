@@ -2,6 +2,7 @@
 title: "Datenanalyseprojekt zum Thema Gender in der deutschen Politik"
 output: html_notebook 
 ---
+### von Malte Bartels, Anna Brauer, Yuliya Khytrova und Fred Nasser
 
 „‘Jeder soll privat #gendern wie er will, aber ich möchte mich nicht im öffentlich-rechtlichen Rundfunk mit moralischem Zeigefinger belehren lassen, wie ich zu sprechen habe. Wer gibt gebührenfinanzierten Redakteuren das Recht, dafür Anpassungsdruck zu erzeugen?‘ (tm) #Merz #Lanz“ – so lautet ein Tweet von CDU-Politiker Friedrich Merz vom 07.05.2021. 
 
@@ -96,17 +97,28 @@ bundestag_gesamt <- bundestag %>%
   arrange(desc(row_sum))
 ```
 
+Verhältnis der Verteilung Männer und Frauen bilden
+```{r}
+bundestag_gesamt <- bundestag_gesamt %>% 
+  mutate(verhältnis_man = gesamt_man/row_sum*100, 
+         verhältnis_frau = gesamt_frau/row_sum*100) 
+```
+
+
 ## Balkendiagramm: Geschlechterverteilung im Bundestag
 
 * Stacked-Barchart zur Geschlechterverteilung im Bundestag pro Partei
 * visualisierung der Daten in möglichst geschlechterneuralen Farben
 ```{r}
-plot_ly(data=bundestag_gesamt, x=~reorder(Partei,-row_sum), y=~gesamt_frau, name="weiblich", marker=list(color=toRGB("#FB7F62")),
-        type="bar", hoverinfo="text", text=~paste("",row_sum), 
-        hovertemplate=paste("Anzahl: %{y:,.0f}", 
-                            "<br>Gesamtanzahl: %{text}")) %>% 
-  add_trace(y=~gesamt_man, name="männlich", marker=list(color=toRGB("#775285"))) %>% 
-  layout(barmode="stack", title="Geschlechterverteilung in den Parteien im Bundestag", # titel position und größe ändern
+plot_ly(data=bundestag_gesamt, x=~reorder(Partei, -verhältnis_man), y=~verhältnis_frau, name="weiblich", marker=list(color=toRGB("#FB7F62")),
+        type="bar", hoverinfo="text", text = ~paste("Gesamtanzahl: ", row_sum,
+                                                    "</br>Anzahl männlich: ", gesamt_man,
+                                                    "</br>Anzahl weiblich: ", gesamt_frau
+                                                    ),
+        hovertemplate=paste("Anteil: %{y:,.0f}%", 
+                            "<br>%{text}")) %>% 
+  add_trace(y=~verhältnis_man, name="männlich", marker=list(color=toRGB("#775285"))) %>% 
+  layout(barmode="stack", title="Geschlechterverteilung in den Parteien im Bundestag", 
          xaxis = list(title = ""), yaxis=list(title="Anzahl Abgeordnete")) %>%
   layout(legend=list(x=1, y=0.5))
 ```
@@ -147,17 +159,27 @@ landtag_gesamt <- landtag_partei %>%
   arrange(desc(row_sum))
 ```
 
+Verhältnis der Verteilung Männer und Frauen bilden
+```{r}
+landtag_gesamt <- landtag_gesamt %>% 
+  mutate(verhältnis_man = gesamt_man/row_sum*100, 
+         verhältnis_frau = gesamt_frau/row_sum*100) 
+```
+
 ## Balkendiagramm: Geschlechterverteilung in den Landtagen
 
 * Stacked-Barchart zur Geschlechterverteilung in den Landtagen pro Partei
 * visualisierung der Daten in möglichst geschlechterneuralen Farben
 ```{r}
-plot_ly(data=landtag_gesamt, x=~reorder(Partei,-row_sum), y=~gesamt_frau, name="weiblich", marker=list(color=toRGB("#FB7F62")), 
-        type="bar", hoverinfo="text", text=~paste("",row_sum), 
-        hovertemplate=paste("Anzahl: %{y:,.0f}", 
-                            "<br>Gesamtanzahl: %{text}")) %>% 
-  add_trace(y=~gesamt_man, name="männlich", marker=list(color=toRGB("#775285"))) %>% 
-  layout(barmode="stack", title="Geschlechterverteilung in den Parteien in den Landtagen", # titel position und größe ändern
+plot_ly(data=landtag_gesamt, x=~reorder(Partei, -verhältnis_man), y=~verhältnis_frau, name="weiblich", marker=list(color=toRGB("#FB7F62")), 
+        type="bar", hoverinfo="text", text=~paste("Gesamtanzahl: ", row_sum,
+                                                    "</br>Anzahl männlich: ", gesamt_man,
+                                                    "</br>Anzahl weiblich: ", gesamt_frau
+                                                    ),
+        hovertemplate=paste("Anteil: %{y:,.0f}%", 
+                            "<br>%{text}")) %>% 
+  add_trace(y=~verhältnis_man, name="männlich", marker=list(color=toRGB("#775285"))) %>% 
+  layout(barmode="stack", title="Geschlechterverteilung in den Parteien in den Landtagen",
          xaxis=list(title=""), yaxis=list(title="Anzahl Abgeordnete")) %>%
   layout(legend=list(x=1, y=0.5))
 ```
@@ -446,12 +468,13 @@ senti <- dfm_group(senti, groups = screen_name)
 senti_frame <- senti %>% 
   quanteda::convert(to = "data.frame") %>% 
   as_tibble() %>% 
-  mutate(doc_id=tolower(doc_id))
+  mutate(doc_id=tolower(doc_id)) %>% 
+  rename(negativ = negative, positiv = positive)
 
 senti_final_frame <- senti_frame %>% 
   full_join(Parlamentarier_senti, by=c("doc_id"="SM_Twitter_user")) %>% 
   group_by(Partei) %>% 
-  summarise(across(c(negative, positive), ~round(sum(., na.rm = TRUE)/sum(negative + positive, na.rm = TRUE ), digits = 2)))
+  summarise(across(c(negativ, positiv), ~round(sum(., na.rm = TRUE)/sum(negativ + positiv, na.rm = TRUE ), digits = 2)))
 ```
 
 ### Barchart zum Sentiment der Tweets
@@ -461,8 +484,8 @@ senti_final_frame <- senti_frame %>%
 * Barchart bilden und in ggplotly konvertieren
 ```{r}
 senti_bar <- senti_final_frame %>% 
-  mutate(Partei = fct_reorder(Partei, positive, max)) %>% 
-  pivot_longer(c(positive, negative), values_to = c("Verhältnis"), names_to = c("Äußerung")) %>% 
+  mutate(Partei = fct_reorder(Partei, positiv, max)) %>% 
+  pivot_longer(c(positiv, negativ), values_to = c("Verhältnis"), names_to = c("Äußerung")) %>% 
   ggplot() + 
   geom_bar(aes(Partei,
                Verhältnis,               
@@ -470,17 +493,18 @@ senti_bar <- senti_final_frame %>%
            position = "stack",
            stat = "identity") +
   scale_fill_manual(values = c("#f46666", "#8EC9BB")) + 
-  theme_classic() + 
+  theme_minimal() + 
   labs(
     title = "Äußerungen der Politiker*innen auf Twitter zum Thema 'Gender'",
     subtitle = "Einschätzung durch Sentimentanalyse",
-    x = "Partei",
+    x = "",
     y = "Verhältnis",
-    fill = "Äußerung"
+    fill = ""
   )
 
-final_senti_plot <- ggplotly(senti_bar)
-final_senti_plot
+final_senti_plot <- ggplotly(senti_bar) 
+final_senti_plot %>% layout(autosize = F, width = 650, height = 500, legend=list(x=1, y=0.5))
+final_senti_plot 
 ```
 # Sentiment-Analyse von Tweets zum Thema Gender
 
